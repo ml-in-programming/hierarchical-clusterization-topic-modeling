@@ -45,9 +45,9 @@ def main(config):
     train_paths = index.path[train_indices]
     test_paths = index.path[test_indices]
     validation_paths = index.path[validation_indices]
-    train_token_paths = index.token_path[train_indices]
-    test_token_paths = index.token_path[test_indices]
-    validation_token_paths = index.token_path[validation_indices]
+    train_token_paths = index.token_path[train_indices].map(get_file)
+    test_token_paths = index.token_path[test_indices].map(get_file)
+    validation_token_paths = index.token_path[validation_indices].map(get_file)
 
     token_counts = pickle.load(open('data/token_counts.pkl', 'rb'))
     token_tag_counts = pickle.load(open('data/token_tag_counts.pkl', 'rb'))
