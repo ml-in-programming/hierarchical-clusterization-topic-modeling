@@ -1,38 +1,27 @@
 {
-    "name": "Mnist_LeNet",
+    "name": "SkipGram on solution tokens",
     "n_gpu": 1,
 
     "arch": {
-        "type": "MnistModel",
-        "args": {}
+        "type": "SkipGramModel",
+        "args": {
+            "vocab_size": 50000,
+            "embed_size": 128
+        }
     },
     "data_loader": {
-        "type": "MnistDataLoader",
+        "type": "TokenDataProducer",
         "args":{
-            "data_dir": "data/",
-            "batch_size": 128,
-            "shuffle": true,
-            "validation_split": 0.1,
-            "num_workers": 2
+            "n_tokens": 50000,
+            "batch_size": 1024,
+            "num_neg_samples": 5
         }
     },
     "optimizer": {
         "type": "Adam",
         "args":{
-            "lr": 0.001,
-            "weight_decay": 0,
+            "lr": 0.003,
             "amsgrad": true
-        }
-    },
-    "loss": "nll_loss",
-    "metrics": [
-        "accuracy", "top_k_acc"
-    ],
-    "lr_scheduler": {
-        "type": "StepLR",
-        "args": {
-            "step_size": 50,
-            "gamma": 0.1
         }
     },
     "trainer": {
@@ -42,7 +31,7 @@
         "save_period": 1,
         "verbosity": 2,
         
-        "monitor": "min val_loss",
+        "monitor": "min loss",
         "early_stop": 10,
 
         "tensorboard": true

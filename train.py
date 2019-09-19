@@ -1,5 +1,8 @@
 import argparse
 import collections
+import os
+
+import pandas as pd
 import torch
 import numpy as np
 import data_loader.data_loaders as module_data
@@ -20,29 +23,37 @@ np.random.seed(SEED)
 def main(config):
     logger = config.get_logger('train')
 
+    data_folder = 'data/codeforces/10/'
+    token_paths = np.array([os.path.join(data_folder, filename) for filename in os.listdir(data_folder)])
+    token2id = {}
+    token_counts = collections.Counter()
+    for filename in token_paths:
+        if os.stat(filename).st_size == 0:
+            continue
+        token_count = pd.read_csv(filename)
+        for token, count in zip(token_count['token'], token_count['count']):
+            token_counts[token] += count
+
+    for i, (token, count) in enumerate(token_counts.most_common(len(token_counts))):
+        token2id[token] = i
+
     # setup data_loader instances
-    data_loader = config.init_obj('data_loader', module_data)
-    valid_data_loader = data_loader.split_validation()
+    data_loader: module_data.TokenDataProducer = config.init_obj('data_loader', module_data)
+    data_loader.set_initial_information(token_paths, token2id, token_counts)
 
     # build model architecture, then print to console
     model = config.init_obj('arch', module_arch)
     logger.info(model)
 
-    # get function handles of loss and metrics
-    criterion = getattr(module_loss, config['loss'])
-    metrics = [getattr(module_metric, met) for met in config['metrics']]
-
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = config.init_obj('optimizer', torch.optim, trainable_params)
 
-    lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer)
-
-    trainer = Trainer(model, criterion, metrics, optimizer,
+    trainer = Trainer(model, criterion=None, metric_ftns=[], optimizer=optimizer,
                       config=config,
                       data_loader=data_loader,
-                      valid_data_loader=valid_data_loader,
-                      lr_scheduler=lr_scheduler)
+                      valid_data_loader=None,
+                      lr_scheduler=None, len_epoch=4000)
 
     trainer.train()
 
