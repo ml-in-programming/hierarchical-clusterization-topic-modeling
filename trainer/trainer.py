@@ -34,6 +34,8 @@ class Trainer(BaseTrainer):
         """
         self.model.train()
         self.train_metrics.reset()
+        total_loss = 0.
+        passed_batches = 0
         for batch_idx, (centers, pos_contexts, neg_contexts) in enumerate(self.data_loader):
             centers, pos_contexts, neg_contexts = \
                 centers.to(self.device), pos_contexts.to(self.device), neg_contexts.to(self.device)
@@ -46,12 +48,17 @@ class Trainer(BaseTrainer):
             self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
             self.train_metrics.update('loss', loss.item())
 
+            total_loss += loss.item()
+            passed_batches += 1
+
             if batch_idx % self.log_step == 0:
                 self.logger.debug('Train Epoch: {} {} Loss: {:.6f}'.format(
                     epoch,
                     self._progress(batch_idx),
-                    loss.item()))
-
+                    total_loss / passed_batches))
+                self.writer.add_scalar('loss', total_loss / passed_batches)
+                total_loss = 0.
+                passed_batches = 0
             if batch_idx == self.len_epoch:
                 break
         log = self.train_metrics.result()

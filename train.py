@@ -1,6 +1,8 @@
 import argparse
 import collections
+import json
 import os
+import pickle
 
 import pandas as pd
 import torch
@@ -20,26 +22,67 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
+data_folder = '../data'
+def get_file(path):
+    return os.path.join(data_folder, path)
+
+def token_path(path):
+    competition, problem, submissions, submission_id = path.split('/')
+    return f'tokens/{competition}/{competition}.{problem}.{submission_id}&tokens.csv'
+
+def path_to_problem(path):
+    c, p, _, _ = path.split('/')
+    return 'codeforces-distinct/' + '/'.join((c, p))
+
 def main(config):
     logger = config.get_logger('train')
 
-    data_folder = 'data/codeforces/10/'
-    token_paths = np.array([os.path.join(data_folder, filename) for filename in os.listdir(data_folder)])
-    token2id = {}
-    token_counts = collections.Counter()
-    for filename in token_paths:
-        if os.stat(filename).st_size == 0:
-            continue
-        token_count = pd.read_csv(filename)
-        for token, count in zip(token_count['token'], token_count['count']):
-            token_counts[token] += count
+    index = pd.read_csv(get_file('index_clean.csv'))
+    index = index.sort_values(by=['contest_id'])
+    train_indices = index.contest_id <= 800
+    test_indices = np.logical_and(800 < index.contest_id, index.contest_id <= 1000)
+    validation_indices = 1000 < index.contest_id
+    train_paths = index.path[train_indices]
+    test_paths = index.path[test_indices]
+    validation_paths = index.path[validation_indices]
+    train_token_paths = index.token_path[train_indices]
+    test_token_paths = index.token_path[test_indices]
+    validation_token_paths = index.token_path[validation_indices]
 
-    for i, (token, count) in enumerate(token_counts.most_common(len(token_counts))):
+    token_counts = pickle.load(open('data/token_counts.pkl', 'rb'))
+    token_tag_counts = pickle.load(open('data/token_tag_counts.pkl', 'rb'))
+
+    problems = set()
+    for path in index.path:
+        problems.add(path_to_problem(path))
+
+    tags = {}
+    all_tags = set()
+    for problem in problems:
+        meta = json.load(open(get_file(os.path.join(problem, 'meta.json')), 'r'))
+        tags[problem] = meta['tags']
+        for tag in tags[problem]:
+            all_tags.add(tag)
+
+    # token_counts = collections.Counter()
+    # for filename in token_paths:
+    #     if os.stat(filename).st_size == 0:
+    #         continue
+    #     token_count = pd.read_csv(filename)
+    #     for token, count in zip(token_count['token'], token_count['count']):
+    #         token_counts[token] += count
+
+    token2id = {}
+    for i, (token, _) in enumerate(token_counts.most_common()):
         token2id[token] = i
+
+    tag2index = {}
+    for i, tag in enumerate(all_tags):
+        tag2index[tag] = i
 
     # setup data_loader instances
     data_loader: module_data.TokenDataProducer = config.init_obj('data_loader', module_data)
-    data_loader.set_initial_information(token_paths, token2id, token_counts)
+    data_loader.set_initial_information(train_token_paths, token2id, token_counts)
 
     # build model architecture, then print to console
     model = config.init_obj('arch', module_arch)
@@ -53,7 +96,7 @@ def main(config):
                       config=config,
                       data_loader=data_loader,
                       valid_data_loader=None,
-                      lr_scheduler=None, len_epoch=4000)
+                      lr_scheduler=None, len_epoch=8000)
 
     trainer.train()
 

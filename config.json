@@ -5,14 +5,14 @@
     "arch": {
         "type": "SkipGramModel",
         "args": {
-            "vocab_size": 50000,
+            "vocab_size": 10000,
             "embed_size": 128
         }
     },
     "data_loader": {
         "type": "TokenDataProducer",
         "args":{
-            "n_tokens": 50000,
+            "n_tokens": 10000,
             "batch_size": 1024,
             "num_neg_samples": 5
         }
@@ -35,5 +35,9 @@
         "early_stop": 10,
 
         "tensorboard": true
+    },
+    "tensorboard" :{
+        "enabled": true,
+        "modules": ["tensorboardX", "torch.utils.tensorboard"]
     }
 }
