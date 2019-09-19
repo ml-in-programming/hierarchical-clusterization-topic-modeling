@@ -44,6 +44,7 @@ class TokenDataProducer:
                     continue
                 token_counts = pd.read_csv(token_path)
                 token_indices = [self.token2id[token] for token in token_counts.token]
+                token_indices = [ind for ind in token_indices if ind < self.n_tokens]
                 for center in token_indices:
                     for target in token_indices:
                         if center != target:
