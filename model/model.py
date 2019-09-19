@@ -1,22 +1,29 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from base import BaseModel
 
+class SkipGramModel(BaseModel):
+    """ word2vec model """
 
-class MnistModel(BaseModel):
-    def __init__(self, num_classes=10):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-        self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, num_classes)
+    def __init__(self, vocab_size, embed_size):
+        super(SkipGramModel, self).__init__()
+        self.vocab_size = vocab_size
+        self.embed_size = embed_size
+        self.embed_centers = nn.Embedding(vocab_size, embed_size)
+        self.embed_contexts = nn.Embedding(vocab_size, embed_size)
 
-    def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, 320)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
+    def forward(self, centers, pos_contexts, neg_contexts):
+        batch_size = centers.size()[0]
+
+        centers = self.embed_centers(centers)
+        pos_contexts = self.embed_contexts(pos_contexts)
+        neg_contexts = self.embed_contexts(neg_contexts)
+
+        pos_mm = torch.bmm(centers.unsqueeze(1), pos_contexts.unsqueeze(2)).squeeze()
+        pos_loss = F.logsigmoid(pos_mm).sum()
+
+        neg_mm = torch.bmm(neg_contexts, centers.unsqueeze(2)).squeeze().sum(dim=1)
+        neg_loss = F.logsigmoid(-neg_mm).sum()
+
+        return -(pos_loss + neg_loss) / batch_size
